@@ -1,0 +1,75 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  solutionPath: 'GiftOfTheGivers.Web/GiftOfTheGivers.Web.sln'
+
+steps:
+
+# Install .NET 8 SDK
+- task: UseDotNet@2
+  displayName: 'Install .NET 8 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'
+
+# Extract the Part 2 project
+- task: PowerShell@2
+  displayName: 'Extract Part 2 project'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "Extracting APPR-PART2.zip..."
+
+      $zipPath = "$(Build.SourcesDirectory)\APPR-PART2.zip"
+      $destination = "$(Build.SourcesDirectory)"
+
+      Expand-Archive -Path $zipPath -DestinationPath $destination -Force
+
+      Write-Host "Project extracted successfully."
+
+# Check the solution exists
+- task: PowerShell@2
+  displayName: 'Verify solution files'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "Checking solution file..."
+
+      $solution = "$(Build.SourcesDirectory)\GiftOfTheGivers.Web\GiftOfTheGivers.Web.sln"
+
+      if (Test-Path $solution) {
+          Write-Host "Solution found: $solution"
+      }
+      else {
+          Write-Error "Solution file was not found."
+          exit 1
+      }
+
+# Restore NuGet dependencies
+- task: DotNetCoreCLI@2
+  displayName: 'Restore NuGet packages'
+  inputs:
+    command: 'restore'
+    projects: '$(solutionPath)'
+
+# Build the solution
+- task: DotNetCoreCLI@2
+  displayName: 'Build solution'
+  inputs:
+    command: 'build'
+    projects: '$(solutionPath)'
+    arguments: '--configuration $(buildConfiguration) --no-restore'
+
+# Run tests
+- task: DotNetCoreCLI@2
+  displayName: 'Run tests'
+  inputs:
+    command: 'test'
+    projects: '$(solutionPath)'
+    arguments: '--configuration $(buildConfiguration) --no-build'
+    publishTestResults: true
